@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { getBrowserSupabaseClient } from '@/lib/supabaseClient';
 
@@ -62,7 +63,24 @@ export default function Sidebar({ initialAuto = true }: { initialAuto?: boolean 
     return () => window.removeEventListener('preferences:menu_auto_collapse' as any, handler);
   }, []);
 
-  const widthClass = collapsed ? 'w-[72px]' : 'w-64';
+  const widthClass = collapsed ? 'w-[56px]' : 'w-64';
+  const pathname = usePathname();
+
+  const NavItem = ({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) => {
+    const active = pathname?.startsWith(href);
+    return (
+      <Link
+        href={href}
+        className={`${itemClass} relative ${active ? 'bg-neutral-100 dark:bg-neutral-900' : ''}`}
+      >
+        <span className="text-lg">{icon}</span>
+        {!collapsed && <span className="flex-1 font-semibold">{label}</span>}
+        {active && (
+          <span className="absolute right-2 h-2 w-2 rounded-full bg-emerald-500" />
+        )}
+      </Link>
+    );
+  };
 
   const handleMouseEnter = () => {
     if (auto && collapsed) setCollapsed(false);
@@ -71,13 +89,13 @@ export default function Sidebar({ initialAuto = true }: { initialAuto?: boolean 
     if (auto && !collapsed) setCollapsed(true);
   };
 
-  const itemClass = 'flex items-center gap-3 px-3 py-2 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-900';
+  const itemClass = 'flex items-center gap-3 px-3 py-2 rounded-md transition-colors duration-150 hover:bg-neutral-100 dark:hover:bg-neutral-900';
 
   return (
     <aside
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className={`${widthClass} transition-[width] duration-200 border-r bg-background/80 backdrop-blur`}
+      className={`${widthClass} transition-[width] duration-200 border-r bg-neutral-50 dark:bg-neutral-950/70 backdrop-blur`}
     >
       <div className="p-3 flex items-center justify-between">
         {!collapsed && <div className="text-sm font-medium">Menu</div>}
@@ -91,24 +109,23 @@ export default function Sidebar({ initialAuto = true }: { initialAuto?: boolean 
       </div>
 
       <nav className="px-2 text-sm">
-        <Link href="/practice" className={itemClass}>
-          <span>🏋️</span>
-          {!collapsed && <span>Luyện tập</span>}
-        </Link>
+        <NavItem href="/practice" icon={<>🏋️</>} label="Luyện tập" />
 
-        <div>
+        <div className="mt-1">
           <button onClick={() => setOpenCourses((v) => !v)} className={itemClass + ' w-full'}>
             <span>📚</span>
-            {!collapsed && <span className="flex-1 text-left">Khóa học</span>}
-            {!collapsed && <span>{openCourses ? '▾' : '▸'}</span>}
+            {!collapsed && <span className="flex-1 text-left font-semibold">Khóa học</span>}
+            {!collapsed && <span className="opacity-70">{openCourses ? '▾' : '▸'}</span>}
           </button>
           {!collapsed && openCourses && (
-            <div className="ml-9">
-              <Link href="/courses/manage" className="block px-2 py-1 rounded hover:underline">Quản lý khóa học</Link>
-              <Link href="/courses/lectures" className="block px-2 py-1 rounded hover:underline">Quản lý bài giảng</Link>
+            <div className="ml-9 border-l pl-3">
+              <NavItem href="/courses/manage" icon={<>🗂️</>} label="Quản lý khóa học" />
+              <NavItem href="/courses/lectures" icon={<>📖</>} label="Quản lý bài giảng" />
             </div>
           )}
         </div>
+
+        <NavItem href="/translate" icon={<>🌐</>} label="Dịch" />
       </nav>
     </aside>
   );
