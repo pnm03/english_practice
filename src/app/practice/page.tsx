@@ -181,17 +181,63 @@ export default function PracticePage() {
     return `${first}${'*'.repeat(Math.max(1, t.length - 2))}${last}`;
   };
 
+  const removeVietnameseAccents = (str: string) => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase();
+  };
+
+  // Load preferences from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedShuffle = localStorage.getItem('practice-shuffle');
+      const savedDirection = localStorage.getItem('practice-direction');
+      
+      if (savedShuffle !== null) {
+        setShuffle(savedShuffle === 'true');
+      }
+      
+      if (savedDirection && ['vi2en', 'en2vi', 'random'].includes(savedDirection)) {
+        setDirection(savedDirection as 'vi2en' | 'en2vi' | 'random');
+      }
+    }
+  }, []);
+
+  // Save preferences to localStorage when they change
+  const handleShuffleChange = (newShuffle: boolean) => {
+    setShuffle(newShuffle);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('practice-shuffle', newShuffle.toString());
+    }
+  };
+
+  const handleDirectionChange = (newDirection: 'vi2en' | 'en2vi' | 'random') => {
+    setDirection(newDirection);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('practice-direction', newDirection);
+    }
+  };
+
   const onSubmit = async () => {
     if (!current) return;
     const target = current.text.trim().toLowerCase();
     const value = input.trim().toLowerCase();
     if (!value) return;
 
-    // Direction check
-    const mode = direction === 'random' ? (Math.random() < 0.5 ? 'vi2en' : 'en2vi') : direction;
+    // Direction check - use fixed mode for each question
+    const mode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
     const isCorrect = mode === 'vi2en'
-      ? value === target
-      : (allMeanings[current.word_id] || []).some((m) => m.toLowerCase().includes(value));
+      ? value === target  // vi2en: hiển thị tiếng Việt (meaning), nhập tiếng Anh (target)
+      : (allMeanings[current.word_id] || []).some((m) => {
+          const meaning = m.trim().toLowerCase();
+          // Check exact match first
+          if (meaning.includes(value)) return true;
+          // Check without accents
+          return removeVietnameseAccents(meaning).includes(removeVietnameseAccents(value));
+        }); // en2vi: hiển thị tiếng Anh (target), nhập tiếng Việt (meaning)
 
     if (isCorrect) {
       setMessage('✅ Chính xác!');
@@ -221,7 +267,8 @@ export default function PracticePage() {
       setAttempts(1);
       setInput(''); // Clear input on first wrong attempt
       // Gợi ý dựa theo hướng luyện tập
-      const hint = direction === 'en2vi' ? maskHint((allMeanings[current.word_id]?.[0] || '')) : maskHint(current.text);
+      const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
+      const hint = currentMode === 'en2vi' ? maskHint((allMeanings[current.word_id]?.[0] || '')) : maskHint(current.text);
       setMessage(`Gợi ý: ${hint}`);
       setTimeout(() => inputRef.current?.focus(), 0);
       return;
@@ -237,7 +284,8 @@ export default function PracticePage() {
         ] as any);
       }
     } catch {}
-    const answer = direction === 'en2vi' ? (allMeanings[current.word_id]?.[0] || '') : current.text;
+    const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
+    const answer = currentMode === 'en2vi' ? (allMeanings[current.word_id]?.[0] || '') : current.text;
     setMessage(`❌ Sai. Đáp án: ${answer}`);
     setAnswered(true);
     
@@ -250,15 +298,7 @@ export default function PracticePage() {
       return;
     }
     
-    if (autoNext) setTimeout(() => {
-      setIdx((p) => p + 1);
-      setCurrentProgressIdx((p) => Math.max(p, idx + 1));
-      setInput('');
-      setAnswered(false);
-      setAttempts(0);
-      setMessage('');
-      setTimeout(() => inputRef.current?.focus(), 0);
-    }, 900);
+    // Don't auto-next when wrong - user needs to manually proceed
   };
 
   const next = () => {
@@ -274,7 +314,8 @@ export default function PracticePage() {
           setInput(nextResult.userAnswer);
           setAnswered(true);
           // Enhanced message showing all details
-          const correctAnswer = direction === 'en2vi' ? (allMeanings[nextResult.word.word_id]?.[0] || '') : nextResult.word.text;
+          const nextMode = direction === 'random' ? (modes[newIdx] || 'en2vi') : direction;
+          const correctAnswer = nextMode === 'en2vi' ? (allMeanings[nextResult.word.word_id]?.[0] || '') : nextResult.word.text;
           const resultMessage = nextResult.correct 
             ? `✅ Chính xác! Bạn đã nhập: "${nextResult.userAnswer}" (${nextResult.attempts} lần thử)`
             : `❌ Sai. Bạn đã nhập: "${nextResult.userAnswer}" | Đáp án đúng: "${correctAnswer}" (${nextResult.attempts} lần thử)`;
@@ -317,7 +358,8 @@ export default function PracticePage() {
         setAnswered(true);
         setIsReviewMode(true);
         // Enhanced message showing all details
-        const correctAnswer = direction === 'en2vi' ? (allMeanings[prevResult.word.word_id]?.[0] || '') : prevResult.word.text;
+        const prevMode = direction === 'random' ? (modes[newIdx] || 'en2vi') : direction;
+        const correctAnswer = prevMode === 'en2vi' ? (allMeanings[prevResult.word.word_id]?.[0] || '') : prevResult.word.text;
         const resultMessage = prevResult.correct 
           ? `✅ Chính xác! Bạn đã nhập: "${prevResult.userAnswer}" (${prevResult.attempts} lần thử)`
           : `❌ Sai. Bạn đã nhập: "${prevResult.userAnswer}" | Đáp án đúng: "${correctAnswer}" (${prevResult.attempts} lần thử)`;
@@ -464,14 +506,14 @@ export default function PracticePage() {
               </div>
               <div>
                 <div className="text-sm font-medium mb-1">Kiểu sắp xếp</div>
-                <label className="flex items-center gap-2"><input type="radio" checked={!shuffle} onChange={()=>setShuffle(false)} />Không xáo trộn (lần lượt)</label>
-                <label className="flex items-center gap-2"><input type="radio" checked={shuffle} onChange={()=>setShuffle(true)} />Xáo trộn (random)</label>
+                <label className="flex items-center gap-2"><input type="radio" checked={!shuffle} onChange={()=>handleShuffleChange(false)} />Không xáo trộn (lần lượt)</label>
+                <label className="flex items-center gap-2"><input type="radio" checked={shuffle} onChange={()=>handleShuffleChange(true)} />Xáo trộn (random)</label>
               </div>
               <div>
                 <div className="text-sm font-medium mb-1">Chế độ luyện</div>
-                <label className="flex items-center gap-2"><input type="radio" checked={direction==='vi2en'} onChange={()=>setDirection('vi2en')} />Hiển thị tiếng Việt → nhập tiếng Anh</label>
-                <label className="flex items-center gap-2"><input type="radio" checked={direction==='en2vi'} onChange={()=>setDirection('en2vi')} />Hiển thị tiếng Anh → nhập tiếng Việt</label>
-                <label className="flex items-center gap-2"><input type="radio" checked={direction==='random'} onChange={()=>setDirection('random')} />Ngẫu nhiên</label>
+                <label className="flex items-center gap-2"><input type="radio" checked={direction==='vi2en'} onChange={()=>handleDirectionChange('vi2en')} />Hiển thị tiếng Việt → nhập tiếng Anh</label>
+                <label className="flex items-center gap-2"><input type="radio" checked={direction==='en2vi'} onChange={()=>handleDirectionChange('en2vi')} />Hiển thị tiếng Anh → nhập tiếng Việt</label>
+                <label className="flex items-center gap-2"><input type="radio" checked={direction==='random'} onChange={()=>handleDirectionChange('random')} />Ngẫu nhiên</label>
               </div>
                 <button
                 className="rounded bg-black text-white dark:bg-white dark:text-black px-4 py-2"
@@ -512,6 +554,15 @@ export default function PracticePage() {
                     for (let j = seq.length - 1; j > 0; j--) { const r = Math.floor(Math.random() * (j + 1)); [seq[j], seq[r]] = [seq[r], seq[j]]; }
                   }
                   setWords(seq);
+                  
+                  // Generate random modes if direction is random
+                  if (direction === 'random') {
+                    const randomModes = seq.map(() => Math.random() < 0.5 ? 'vi2en' : 'en2vi');
+                    setModes(randomModes);
+                  } else {
+                    setModes([]);
+                  }
+                  
                   setIdx(0);
                   setCurrentProgressIdx(0);
                   setConfigured(true);
@@ -574,10 +625,10 @@ export default function PracticePage() {
             </div>
           </div>
         ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 max-w-4xl mx-auto">
           {/* breadcrumb + progress */}
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <div className="text-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-md border p-3 gap-2">
+            <div className="text-sm truncate">
               {selectedCourseName || 'Khóa học'}
               {' > '}
               {(() => {
@@ -586,65 +637,108 @@ export default function PracticePage() {
                 return `${titles.length} bài giảng`;
               })()} ({total} từ vựng)
             </div>
-            <div className="flex items-center gap-6 text-sm">
-              <div>x/{total} từ</div>
-              <label className="flex items-center gap-2">
+            <div className="flex items-center gap-3 text-sm">
+              <label className="flex items-center gap-2 whitespace-nowrap">
                 <input type="checkbox" checked={autoNext} onChange={(e)=>setAutoNext(e.target.checked)} />
-                Tự động tiếp theo nếu trả lời đúng
+                <span className="hidden sm:inline">Tự động tiếp theo nếu trả lời đúng</span>
+                <span className="sm:hidden">Auto next</span>
               </label>
             </div>
           </div>
 
           {/* Notification row */}
           <div className="flex items-center justify-between rounded-md border p-3">
-            <div className="text-sm min-h-6">{message || 'Thông báo / Gợi ý sẽ hiển thị tại đây'}</div>
+            <div className="text-sm min-h-6 flex items-center gap-2">
+              {message ? (
+                message
+              ) : (
+                <div className="animate-pulse">
+                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
+            </div>
             <div className="text-sm">{idx + 1}/{total}</div>
           </div>
 
           {/* Word prompt depends on direction */}
-          <div className="rounded-md border p-6 text-center text-xl font-semibold min-h-[64px] flex items-center justify-center gap-3">
-            {current ? (
-              direction==='en2vi' ? (
+          <div className="rounded-md border p-4 sm:p-6 text-center text-lg sm:text-xl font-semibold min-h-[64px] flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+            {current ? (() => {
+              const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
+              return currentMode === 'en2vi' ? (
                 <>
                   <span>{current.text}</span>
-                  {current.ipa && <span className="text-base text-neutral-500">[{current.ipa}]</span>}
+                  {current.ipa && <span className="text-sm sm:text-base text-neutral-500">[{current.ipa}]</span>}
                   {current.audio_url && (
-                    <audio controls className="h-8"><source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} /></audio>
+                    <audio controls className="h-8 w-full max-w-48"><source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} /></audio>
                   )}
                 </>
               ) : (
-                <span>{allMeanings[current.word_id]?.[0] || meanings[current.word_id] || '—'}</span>
-              )
-            ) : '—'}
+                <span className="break-words">{allMeanings[current.word_id]?.[0] || meanings[current.word_id] || '—'}</span>
+              );
+            })() : '—'}
           </div>
 
           {/* Input */}
-          <div className="rounded-md border p-6">
+          <div className="rounded-md border p-4 sm:p-6">
             <input
               value={input}
               onChange={(e) => !isReviewMode && setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key==='Enter' && !isReviewMode) onSubmit(); }}
-              placeholder={isReviewMode ? 'Chế độ xem lại (chỉ đọc)' : (direction==='en2vi' ? 'Nhập nghĩa tiếng Việt...' : 'Nhập từ tiếng Anh...')}
-              className={`w-full rounded border px-4 py-3 ${isReviewMode ? 'bg-neutral-100 dark:bg-neutral-800 cursor-not-allowed' : 'bg-transparent'}`}
+              onKeyDown={(e) => { 
+                if (e.key==='Enter' && !isReviewMode) {
+                  onSubmit(); 
+                } else if (e.key==='ArrowLeft' && answered) {
+                  next(); // Go to next question with left arrow when answered
+                }
+              }}
+              placeholder={isReviewMode ? 'Chế độ xem lại (chỉ đọc)' : (() => {
+                const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
+                return currentMode === 'en2vi' ? 'Nhập nghĩa tiếng Việt...' : 'Nhập từ tiếng Anh...';
+              })()}
+              className={`w-full rounded border px-4 py-3 text-base ${isReviewMode ? 'bg-neutral-100 dark:bg-neutral-800 cursor-not-allowed' : 'bg-transparent'}`}
               disabled={isReviewMode}
               ref={inputRef}
             />
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-3">
-            <button onClick={prev} disabled={idx === 0} className={`border rounded px-4 py-2 text-sm ${idx === 0 ? 'opacity-60 cursor-not-allowed' : ''}`}>Quay lại</button>
-            <button onClick={onSubmit} disabled={isReviewMode || answered || input.trim()===''} className={`border rounded px-4 py-2 text-sm ${(!isReviewMode && !answered && input.trim()!=='') ? '' : 'opacity-60 cursor-not-allowed'}`}>Kiểm tra</button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <button 
-              disabled={(!isReviewMode && !answered) || (isReviewMode && idx >= currentProgressIdx)} 
-              onClick={next} 
-              className={`rounded px-4 py-2 text-sm ${(isReviewMode && idx < currentProgressIdx) || (!isReviewMode && answered) ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-neutral-200 text-neutral-600 cursor-not-allowed'}`}
+              onClick={() => {
+                setConfigured(false);
+                setShowResults(false);
+                setIdx(0);
+                setPracticeResults([]);
+                setIsReviewMode(false);
+                setInput('');
+                setAttempts(0);
+                setMessage('');
+                setCurrentProgressIdx(0);
+              }} 
+              className="border rounded px-4 py-3 sm:py-2 text-sm text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 order-3 sm:order-1"
             >
-              {isReviewMode 
-                ? (idx < currentProgressIdx ? 'Tiếp tục' : 'Đã xem hết')
-                : (idx + 1 >= total ? 'Kết thúc' : 'Từ tiếp theo')
-              }
+              ← Thoát
             </button>
+            <div className="flex items-center gap-3 order-1 sm:order-2">
+              <button 
+                onClick={onSubmit} 
+                disabled={isReviewMode || answered || input.trim()===''} 
+                className={`flex-1 sm:flex-none border rounded px-4 py-3 sm:py-2 text-sm ${(!isReviewMode && !answered && input.trim()!=='') ? '' : 'opacity-60 cursor-not-allowed'}`}
+              >
+                Kiểm tra
+              </button>
+              <button 
+                disabled={(!isReviewMode && !answered) || (isReviewMode && idx >= currentProgressIdx)} 
+                onClick={next} 
+                className={`flex-1 sm:flex-none rounded px-4 py-3 sm:py-2 text-sm ${(isReviewMode && idx < currentProgressIdx) || (!isReviewMode && answered) ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-neutral-200 text-neutral-600 cursor-not-allowed'}`}
+              >
+                {isReviewMode 
+                  ? (idx < currentProgressIdx ? 'Tiếp tục' : 'Đã xem hết')
+                  : (idx + 1 >= total ? 'Kết thúc' : 'Từ tiếp theo')
+                }
+              </button>
+            </div>
           </div>
         </div>)
       )}
