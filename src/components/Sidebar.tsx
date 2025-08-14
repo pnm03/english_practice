@@ -27,6 +27,7 @@ export default function Sidebar({ initialAuto = true }: { initialAuto?: boolean 
     return stored;
   });
   const [openCourses, setOpenCourses] = useState(true);
+  const [openPractice, setOpenPractice] = useState(true);
 
   useEffect(() => {
     if (!supabase) return;
@@ -109,7 +110,20 @@ export default function Sidebar({ initialAuto = true }: { initialAuto?: boolean 
       </div>
 
       <nav className="px-2 text-sm">
-        <NavItem href="/practice" icon={<>🏋️</>} label="Luyện tập" />
+        <div className="mt-1">
+          <button onClick={() => setOpenPractice((v) => !v)} className={itemClass + ' w-full'}>
+            <span>🏋️</span>
+            {!collapsed && <span className="flex-1 text-left font-semibold">Luyện tập</span>}
+            {!collapsed && <span className="opacity-70">{openPractice ? '▾' : '▸'}</span>}
+          </button>
+          {!collapsed && openPractice && (
+            <div className="ml-9 border-l pl-3">
+              <NavItem href="/practice" icon={<>📝</>} label="Luyện tập" />
+              <NavItem href="/practice/exam" icon={<>🧪</>} label="Kiểm tra" />
+              <NavItem href="/practice/wrong" icon={<>⚠️</>} label="Luyện tập từ sai" />
+            </div>
+          )}
+        </div>
 
         <div className="mt-1">
           <button onClick={() => setOpenCourses((v) => !v)} className={itemClass + ' w-full'}>
