@@ -625,119 +625,180 @@ export default function PracticePage() {
             </div>
           </div>
         ) : (
-        <div className="space-y-3 max-w-4xl mx-auto">
-          {/* breadcrumb + progress */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between rounded-md border p-3 gap-2">
-            <div className="text-sm truncate">
-              {selectedCourseName || 'Khóa học'}
-              {' > '}
-              {(() => {
-                const titles = Array.from(selectedLectures).map((lid)=> lectures.find((l)=>l.lecture_id===lid)?.title).filter(Boolean);
-                if (titles.length === 1) return titles[0];
-                return `${titles.length} bài giảng`;
-              })()} ({total} từ vựng)
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <label className="flex items-center gap-2 whitespace-nowrap">
-                <input type="checkbox" checked={autoNext} onChange={(e)=>setAutoNext(e.target.checked)} />
-                <span className="hidden sm:inline">Tự động tiếp theo nếu trả lời đúng</span>
-                <span className="sm:hidden">Auto next</span>
+        <div className="max-w-2xl mx-auto px-2 sm:px-4">
+          {/* Header card with progress */}
+          <div className="bg-white dark:bg-neutral-900 rounded-lg sm:rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 p-3 sm:p-6 mb-4 sm:mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm text-neutral-600 dark:text-neutral-400 truncate">
+                {selectedCourseName || 'Khóa học'} • {(() => {
+                  const titles = Array.from(selectedLectures).map((lid)=> lectures.find((l)=>l.lecture_id===lid)?.title).filter(Boolean);
+                  if (titles.length === 1) return titles[0];
+                  return `${titles.length} bài giảng`;
+                })()} • {total} từ
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={autoNext} onChange={(e)=>setAutoNext(e.target.checked)} className="rounded" />
+                <span className="hidden sm:inline text-neutral-600 dark:text-neutral-400">Auto next</span>
               </label>
             </div>
-          </div>
-
-          {/* Notification row */}
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <div className="text-sm min-h-6 flex items-center gap-2">
-              {message ? (
-                message
-              ) : (
-                <div className="animate-pulse">
-                  <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              )}
+            
+            {/* Progress bar */}
+            <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-2 mb-2">
+              <div 
+                className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${total > 0 ? ((idx + 1) / total) * 100 : 0}%` }}
+              />
             </div>
-            <div className="text-sm">{idx + 1}/{total}</div>
+            <div className="flex justify-between text-xs text-neutral-500 dark:text-neutral-400">
+              <span>Câu {idx + 1} / {total}</span>
+              <span>{total > 0 ? Math.round(((idx + 1) / total) * 100) : 0}%</span>
+            </div>
           </div>
 
-          {/* Word prompt depends on direction */}
-          <div className="rounded-md border p-4 sm:p-6 text-center text-lg sm:text-xl font-semibold min-h-[64px] flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
-            {current ? (() => {
-              const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
-              return currentMode === 'en2vi' ? (
-                <>
-                  <span>{current.text}</span>
-                  {current.ipa && <span className="text-sm sm:text-base text-neutral-500">[{current.ipa}]</span>}
-                  {current.audio_url && (
-                    <audio controls className="h-8 w-full max-w-48"><source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} /></audio>
+          {/* Main practice card */}
+          <div className="bg-white dark:bg-neutral-900 rounded-xl sm:rounded-2xl shadow-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+            {/* Notification area */}
+            {message && (
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-b border-neutral-200 dark:border-neutral-700 p-4">
+                <div className="text-sm text-center">{message}</div>
+              </div>
+            )}
+            
+            {/* Question area */}
+            <div className="p-4 sm:p-8">
+              <div className="text-center mb-8">
+                {/* Word display */}
+                <div className="min-h-[80px] flex flex-col items-center justify-center gap-3">
+                  {current ? (() => {
+                    const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
+                    return currentMode === 'en2vi' ? (
+                      <div className="text-center">
+                        <div className="text-2xl sm:text-3xl font-bold text-neutral-800 dark:text-neutral-100 mb-2">
+                          {current.text}
+                        </div>
+                        {current.ipa && (
+                          <div className="text-sm text-neutral-500 dark:text-neutral-400 mb-3">
+                            [{current.ipa}]
+                          </div>
+                        )}
+                        {current.audio_url && (
+                          <audio controls className="h-10 mx-auto">
+                            <source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} />
+                          </audio>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-2xl sm:text-3xl font-bold text-neutral-800 dark:text-neutral-100 text-center leading-relaxed">
+                        {allMeanings[current.word_id]?.[0] || meanings[current.word_id] || '—'}
+                      </div>
+                    );
+                  })() : (
+                    <div className="text-2xl text-neutral-400">—</div>
                   )}
-                </>
-              ) : (
-                <span className="break-words">{allMeanings[current.word_id]?.[0] || meanings[current.word_id] || '—'}</span>
-              );
-            })() : '—'}
-          </div>
+                </div>
+              </div>
 
-          {/* Input */}
-          <div className="rounded-md border p-4 sm:p-6">
-            <input
-              value={input}
-              onChange={(e) => !isReviewMode && setInput(e.target.value)}
-              onKeyDown={(e) => { 
-                if (e.key==='Enter' && !isReviewMode) {
-                  onSubmit(); 
-                } else if (e.key==='ArrowLeft' && answered) {
-                  next(); // Go to next question with left arrow when answered
-                }
-              }}
-              placeholder={isReviewMode ? 'Chế độ xem lại (chỉ đọc)' : (() => {
-                const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
-                return currentMode === 'en2vi' ? 'Nhập nghĩa tiếng Việt...' : 'Nhập từ tiếng Anh...';
-              })()}
-              className={`w-full rounded border px-4 py-3 text-base ${isReviewMode ? 'bg-neutral-100 dark:bg-neutral-800 cursor-not-allowed' : 'bg-transparent'}`}
-              disabled={isReviewMode}
-              ref={inputRef}
-            />
-          </div>
+              {/* Input area */}
+              <div className="mb-6">
+                <div className="relative">
+                  <input
+                    value={input}
+                    onChange={(e) => !isReviewMode && setInput(e.target.value)}
+                    onKeyDown={(e) => { 
+                      if (e.key==='Enter' && !isReviewMode) {
+                        onSubmit(); 
+                      } else if (e.key==='ArrowLeft' && answered) {
+                        next();
+                      }
+                    }}
+                    placeholder={isReviewMode ? 'Chế độ xem lại (chỉ đọc)' : (() => {
+                      const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
+                      return currentMode === 'en2vi' ? 'Nhập nghĩa tiếng Việt...' : 'Nhập từ tiếng Anh...';
+                    })()}
+                    className={`w-full text-center text-lg px-6 py-4 rounded-xl border-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+                      isReviewMode 
+                        ? 'bg-neutral-100 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600 cursor-not-allowed' 
+                        : 'bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600'
+                    }`}
+                    disabled={isReviewMode}
+                    ref={inputRef}
+                  />
+                  {!message && !isReviewMode && (
+                    <div className="absolute right-4 top-1/2 transform -translate-y-1/2 group">
+                      <div className="animate-pulse cursor-help">
+                        <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      {/* Tooltip */}
+                      <div className="invisible group-hover:visible absolute bottom-full right-0 mb-2 w-64 bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs rounded-lg py-2 px-3 text-center shadow-lg z-10">
+                        {(() => {
+                          const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
+                          if (currentMode === 'en2vi') {
+                            return `Hãy nhập nghĩa tiếng Việt cho từ tiếng Anh "${current?.text || ''}"`;
+                          } else {
+                            const meaning = allMeanings[current?.word_id || '']?.[0] || meanings[current?.word_id || ''] || '';
+                            return `Hãy nhập từ tiếng Anh cho nghĩa tiếng Việt "${meaning}"`;
+                          }
+                        })()}
+                        <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-neutral-900 dark:border-t-neutral-100"></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-          {/* Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <button 
-              onClick={() => {
-                setConfigured(false);
-                setShowResults(false);
-                setIdx(0);
-                setPracticeResults([]);
-                setIsReviewMode(false);
-                setInput('');
-                setAttempts(0);
-                setMessage('');
-                setCurrentProgressIdx(0);
-              }} 
-              className="border rounded px-4 py-3 sm:py-2 text-sm text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 order-3 sm:order-1"
-            >
-              ← Thoát
-            </button>
-            <div className="flex items-center gap-3 order-1 sm:order-2">
-              <button 
-                onClick={onSubmit} 
-                disabled={isReviewMode || answered || input.trim()===''} 
-                className={`flex-1 sm:flex-none border rounded px-4 py-3 sm:py-2 text-sm ${(!isReviewMode && !answered && input.trim()!=='') ? '' : 'opacity-60 cursor-not-allowed'}`}
-              >
-                Kiểm tra
-              </button>
-              <button 
-                disabled={(!isReviewMode && !answered) || (isReviewMode && idx >= currentProgressIdx)} 
-                onClick={next} 
-                className={`flex-1 sm:flex-none rounded px-4 py-3 sm:py-2 text-sm ${(isReviewMode && idx < currentProgressIdx) || (!isReviewMode && answered) ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-neutral-200 text-neutral-600 cursor-not-allowed'}`}
-              >
-                {isReviewMode 
-                  ? (idx < currentProgressIdx ? 'Tiếp tục' : 'Đã xem hết')
-                  : (idx + 1 >= total ? 'Kết thúc' : 'Từ tiếp theo')
-                }
-              </button>
+              {/* Controls */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+                <button 
+                  onClick={() => {
+                    setConfigured(false);
+                    setShowResults(false);
+                    setIdx(0);
+                    setPracticeResults([]);
+                    setIsReviewMode(false);
+                    setInput('');
+                    setAttempts(0);
+                    setMessage('');
+                    setCurrentProgressIdx(0);
+                  }} 
+                  className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-700 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  <span className="text-sm font-medium">Thoát</span>
+                </button>
+                
+                <div className="flex items-center gap-3 order-1 sm:order-none">
+                  <button 
+                    onClick={onSubmit} 
+                    disabled={isReviewMode || answered || input.trim()===''} 
+                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                      (!isReviewMode && !answered && input.trim()!=='') 
+                        ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-md hover:shadow-lg' 
+                        : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-400 cursor-not-allowed'
+                    }`}
+                  >
+                    Kiểm tra
+                  </button>
+                  
+                  <button 
+                    disabled={(!isReviewMode && !answered) || (isReviewMode && idx >= currentProgressIdx)} 
+                    onClick={next} 
+                    className={`flex-1 sm:flex-none px-4 sm:px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                      (isReviewMode && idx < currentProgressIdx) || (!isReviewMode && answered) 
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-md hover:shadow-lg' 
+                        : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {isReviewMode 
+                      ? (idx < currentProgressIdx ? 'Tiếp tục' : 'Đã xem hết')
+                      : (idx + 1 >= total ? 'Kết thúc' : 'Từ tiếp theo')
+                    }
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>)
