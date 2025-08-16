@@ -697,29 +697,29 @@ export default function PracticePage() {
             
             {/* Question area */}
             <div className="p-4 sm:p-8">
-              <div className="text-center mb-8">
+              <div className="text-center mb-4 sm:mb-8">
                 {/* Word display */}
-                <div className="min-h-[80px] flex flex-col items-center justify-center gap-3">
+                <div className="min-h-[72px] sm:min-h-[80px] flex flex-col items-center justify-center gap-2 sm:gap-3">
                   {current ? (() => {
                     const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
                     return currentMode === 'en2vi' ? (
                       <div className="text-center">
-                        <div className="text-2xl sm:text-3xl font-bold text-neutral-800 dark:text-neutral-100 mb-2">
+                        <div className="text-2xl sm:text-3xl font-bold text-neutral-800 dark:text-neutral-100 mb-1 sm:mb-2 break-words max-w-full leading-tight">
                           {current.text}
                         </div>
                         {current.ipa && (
-                          <div className="text-sm text-neutral-500 dark:text-neutral-400 mb-3">
+                          <div className="text-sm text-neutral-500 dark:text-neutral-400 mb-1 sm:mb-3">
                             [{current.ipa}]
                           </div>
                         )}
                         {current.audio_url && (
-                          <audio controls className="h-10 mx-auto">
+                          <audio controls className="h-10 w-full max-w-xs sm:max-w-sm mx-auto">
                             <source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} />
                           </audio>
                         )}
                       </div>
                     ) : (
-                      <div className="text-2xl sm:text-3xl font-bold text-neutral-800 dark:text-neutral-100 text-center leading-relaxed">
+                      <div className="text-2xl sm:text-3xl font-bold text-neutral-800 dark:text-neutral-100 text-center leading-tight break-words max-w-full">
                         {allMeanings[current.word_id]?.[0] || meanings[current.word_id] || '—'}
                       </div>
                     );
@@ -730,7 +730,7 @@ export default function PracticePage() {
               </div>
 
               {/* Input area */}
-              <div className="mb-6">
+              <div className="mb-3 sm:mb-6">
                 <div className="relative">
                   <input
                     value={input}
