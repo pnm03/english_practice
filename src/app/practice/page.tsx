@@ -31,6 +31,21 @@ export default function PracticePage() {
   const [answered, setAnswered] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Focus the input and center it vertically in viewport on mobile devices
+  const focusAndCenterInput = (smooth: boolean = true) => {
+    const el = inputRef.current;
+    if (!el) return;
+    try {
+      // preventScroll to avoid double scroll jumps
+      (el as any).focus({ preventScroll: true });
+    } catch {
+      el.focus();
+    }
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+    }
+  };
+
   const current = words[idx];
   const total = words.length;
 
@@ -170,7 +185,7 @@ export default function PracticePage() {
     setAttempts(0);
     setMessage('');
     setAnswered(false);
-    setTimeout(() => inputRef.current?.focus(), 0);
+    setTimeout(() => focusAndCenterInput(), 0);
   }, [idx]);
 
   const maskHint = (target: string) => {
@@ -258,7 +273,7 @@ export default function PracticePage() {
         setAnswered(false);
         setAttempts(0);
         setMessage('');
-        setTimeout(() => inputRef.current?.focus(), 0);
+        setTimeout(() => focusAndCenterInput(), 0);
       }, 600);
       return;
     }
@@ -270,7 +285,7 @@ export default function PracticePage() {
       const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
       const hint = currentMode === 'en2vi' ? maskHint((allMeanings[current.word_id]?.[0] || '')) : maskHint(current.text);
       setMessage(`Gợi ý: ${hint}`);
-      setTimeout(() => inputRef.current?.focus(), 0);
+      setTimeout(() => focusAndCenterInput(), 0);
       return;
     }
 
@@ -327,7 +342,7 @@ export default function PracticePage() {
           setAttempts(0);
           setMessage('');
           setIsReviewMode(false);
-          setTimeout(() => inputRef.current?.focus(), 0);
+          setTimeout(() => focusAndCenterInput(), 0);
         }
       }
       return;
@@ -572,7 +587,7 @@ export default function PracticePage() {
                   setInput('');
                   setAttempts(0);
                   setMessage('');
-                  setTimeout(()=>inputRef.current?.focus(), 0);
+                  setTimeout(()=>focusAndCenterInput(false), 0);
                 }}
               >Bắt đầu</button>
             </div>
