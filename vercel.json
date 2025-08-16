@@ -4,7 +4,6 @@
   "installCommand": "npm ci",
   "framework": "nextjs",
   "outputDirectory": ".next",
-  "ignoreCommand": "echo 'Ignoring build errors'",
   "git": {
     "deploymentEnabled": {
       "main": true
