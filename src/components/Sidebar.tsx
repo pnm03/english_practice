@@ -119,7 +119,7 @@ export default function Sidebar({ initialAuto = true }: { initialAuto?: boolean 
           {!collapsed && openPractice && (
             <div className="ml-9 border-l pl-3">
               <NavItem href="/practice" icon={<>📝</>} label="Luyện tập" />
-              <NavItem href="/practice/exam" icon={<>🧪</>} label="Kiểm tra" />
+              <NavItem href="/test" icon={<>🧪</>} label="Kiểm tra" />
               <NavItem href="/practice/wrong" icon={<>⚠️</>} label="Luyện tập từ sai" />
             </div>
           )}
