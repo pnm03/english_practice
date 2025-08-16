@@ -42,9 +42,25 @@ export default function PracticePage() {
       el.focus();
     }
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+      // Position the input near the bottom of the viewport (~10% margin from bottom)
+      const vh = window.innerHeight;
+      const rect = el.getBoundingClientRect();
+      const desiredTop = vh * 0.9 - rect.height; // bottom at 90% of viewport height
+      const delta = rect.top - desiredTop;
+      if (Math.abs(delta) > 1) {
+        window.scrollBy({ top: delta, behavior: smooth ? 'smooth' : 'auto' });
+      }
     }
   };
+
+  // When virtual keyboard shows/hides on mobile, re-center toward the bottom
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.innerWidth >= 768) return;
+    const handler = () => focusAndCenterInput(false);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   const current = words[idx];
   const total = words.length;
