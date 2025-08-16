@@ -30,6 +30,9 @@ export default function PracticePage() {
   const [input, setInput] = useState('');
   const [answered, setAnswered] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
 
   // Focus the input and center it vertically in viewport on mobile devices
   const focusAndCenterInput = (smooth: boolean = true) => {
@@ -56,11 +59,43 @@ export default function PracticePage() {
   // When virtual keyboard shows/hides on mobile, re-center toward the bottom
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (window.innerWidth >= 768) return;
-    const handler = () => focusAndCenterInput(false);
+    const onResize = () => {
+      const isMobile = window.innerWidth < 768;
+      setIsMobileView(isMobile);
+      if (isMobile) focusAndCenterInput(false);
+    };
+    onResize();
+    const handler = onResize;
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  // Reset audio state on question change
+  useEffect(() => {
+    setIsPlaying(false);
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      } catch {}
+    }
+  }, [idx]);
+
+  const togglePlay = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (isPlaying) {
+      el.pause();
+      setIsPlaying(false);
+    } else {
+      try {
+        el.currentTime = 0;
+        el.play();
+        setIsPlaying(true);
+        el.onended = () => setIsPlaying(false);
+      } catch {}
+    }
+  };
 
   const current = words[idx];
   const total = words.length;
@@ -713,9 +748,24 @@ export default function PracticePage() {
                           </div>
                         )}
                         {current.audio_url && (
-                          <audio controls className="h-10 w-full max-w-xs sm:max-w-sm mx-auto">
-                            <source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} />
-                          </audio>
+                          isMobileView ? (
+                            <div className="flex justify-center mt-1 sm:mt-2">
+                              <button
+                                onClick={togglePlay}
+                                className={`px-4 py-2 rounded-full text-white text-sm font-medium shadow ${isPlaying ? 'bg-red-500' : 'bg-blue-600'} active:scale-95`}
+                              >
+                                {isPlaying ? 'Dừng' : 'Phát audio'}
+                              </button>
+                              {/* Hidden audio element for playback */}
+                              <audio ref={audioRef} className="hidden">
+                                <source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} />
+                              </audio>
+                            </div>
+                          ) : (
+                            <audio controls className="h-10 w-full max-w-xs sm:max-w-sm mx-auto">
+                              <source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} />
+                            </audio>
+                          )
                         )}
                       </div>
                     ) : (
