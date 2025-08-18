@@ -15,7 +15,7 @@ export type Word = {
   audio_url: string | null;
 };
 
-type MeaningItem = { part_of_speech?: string; meaning: string };
+type MeaningItem = { part_of_speech?: string; example_sentence?: string; meaning: string };
 
 type DictResult = { ipa?: string; audio?: string | null; meanings?: MeaningItem[]; suggestions?: string[] };
 
@@ -157,7 +157,7 @@ export default function LectureWordsPage() {
     // Only when not filtering and user can edit
     if (!canEdit) return;
     if (query.trim() !== '') {
-      showToast('Hãy xóa ô tìm kiếm trước khi sắp xếp', { type: 'warning' });
+      showToast('Hãy xóa ô tìm kiếm trước khi sắp xếp', { type: 'info' });
       return;
     }
     if (fromId === toId) return;
@@ -468,9 +468,10 @@ export default function LectureWordsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.text]);
 
-  const addMeaning = (m?: MeaningItem) => setForm((f) => ({ ...f, meanings: [...f.meanings, m ?? { meaning: '' }] }));
+  const addMeaning = (m?: MeaningItem) => setForm((f) => ({ ...f, meanings: [...f.meanings, m ? { meaning: m.meaning } : { meaning: '' }] }));
   const removeMeaning = (idx: number) => setForm((f) => ({ ...f, meanings: f.meanings.filter((_, i) => i !== idx) }));
   const updateMeaning = (idx: number, value: string) => setForm((f) => ({ ...f, meanings: f.meanings.map((m, i) => (i === idx ? { ...m, meaning: value } : m)) }));
+  const updateMeaningExample = (idx: number, value: string) => setForm((f) => ({ ...f, meanings: f.meanings.map((m, i) => (i === idx ? { ...m, example_sentence: value } : m)) }));
 
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -489,7 +490,7 @@ export default function LectureWordsPage() {
       if (wid && form.meanings.length > 0) {
         const payload = form.meanings
           .filter((m) => m.meaning.trim() !== '')
-          .map((m) => ({ word_id: wid, part_of_speech: m.part_of_speech || null, meaning: m.meaning, example_sentence: null }));
+          .map((m) => ({ word_id: wid, part_of_speech: m.part_of_speech || null, meaning: m.meaning, example_sentence: m.example_sentence || null }));
         if (payload.length > 0) await supabase.from('wordmeanings').insert(payload);
         // update meanings map optimistically
         setMeaningsMap((mp) => ({ ...mp, [wid]: payload.map((p) => p.meaning) }));
@@ -528,7 +529,7 @@ export default function LectureWordsPage() {
       await supabase.from('wordmeanings').delete().eq('word_id', editing.word_id);
       const payload = form.meanings
         .filter((m) => m.meaning.trim() !== '')
-        .map((m) => ({ word_id: editing.word_id, part_of_speech: m.part_of_speech || null, meaning: m.meaning, example_sentence: null }));
+        .map((m) => ({ word_id: editing.word_id, part_of_speech: m.part_of_speech || null, meaning: m.meaning, example_sentence: m.example_sentence || null }));
       if (payload.length > 0) await supabase.from('wordmeanings').insert(payload);
       showToast('Đã lưu từ vựng', { type: 'success' });
       // optimistic update
@@ -568,8 +569,8 @@ export default function LectureWordsPage() {
     setForm({ text: w.text, ipa: w.ipa ?? '', order: w.order_in_lecture != null ? String(w.order_in_lecture) : '', imagePath: w.image_url, audioPath: w.audio_url, meanings: [] });
     // Load meanings for this word
     (async () => {
-      const { data } = await supabase.from('wordmeanings').select('meaning,part_of_speech').eq('word_id', w.word_id).order('meaning_added_at', { ascending: true });
-      setForm((f) => ({ ...f, meanings: ((data as any) ?? []).map((m: any) => ({ meaning: m.meaning, part_of_speech: m.part_of_speech || undefined })) }));
+      const { data } = await supabase.from('wordmeanings').select('meaning,part_of_speech,example_sentence').eq('word_id', w.word_id).order('meaning_added_at', { ascending: true });
+      setForm((f) => ({ ...f, meanings: ((data as any) ?? []).map((m: any) => ({ meaning: m.meaning, part_of_speech: m.part_of_speech || undefined, example_sentence: m.example_sentence || undefined })) }));
     })();
   };
 
@@ -777,9 +778,12 @@ export default function LectureWordsPage() {
                 )}
                 <div className="grid gap-2">
                   {form.meanings.map((m, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <input value={m.meaning} onChange={(e) => updateMeaning(idx, e.target.value)} placeholder={`Nghĩa #${idx + 1}`} disabled={!!editing && !editMode} className="flex-1 rounded-md border px-3 py-2 bg-transparent" />
-                      <button type="button" onClick={() => removeMeaning(idx)} disabled={!!editing && !editMode} className="text-xs border rounded px-2 py-1">Xóa</button>
+                    <div key={idx} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <input value={m.meaning} onChange={(e) => updateMeaning(idx, e.target.value)} placeholder={`Nghĩa #${idx + 1}`} disabled={!!editing && !editMode} className="flex-1 rounded-md border px-3 py-2 bg-transparent" />
+                        <button type="button" onClick={() => removeMeaning(idx)} disabled={!!editing && !editMode} className="text-xs border rounded px-2 py-1">Xóa</button>
+                      </div>
+                      <input value={m.example_sentence || ''} onChange={(e) => updateMeaningExample(idx, e.target.value)} placeholder="Ví dụ minh họa (không bắt buộc)" disabled={!!editing && !editMode} className="w-full rounded-md border px-3 py-2 bg-transparent" />
                     </div>
                   ))}
                 </div>
