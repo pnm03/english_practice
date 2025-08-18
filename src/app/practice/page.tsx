@@ -22,6 +22,7 @@ export default function PracticePage() {
   const [words, setWords] = useState<Word[]>([]);
   const [meanings, setMeanings] = useState<Record<string, string>>({});
   const [allMeanings, setAllMeanings] = useState<Record<string, string[]>>({});
+  const [examples, setExamples] = useState<Record<string, string>>({});
   const [idx, setIdx] = useState(0);
   const [attempts, setAttempts] = useState(0);
   const [message, setMessage] = useState<string>('');
@@ -29,6 +30,7 @@ export default function PracticePage() {
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [answered, setAnswered] = useState(false);
+  const [showExample, setShowExample] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -142,18 +144,23 @@ export default function PracticePage() {
         const ids = list.map((x) => x.word_id);
         const { data: m } = await supabase
           .from('wordmeanings')
-          .select('word_id,meaning')
+          .select('word_id,meaning,example_sentence')
           .in('word_id', ids)
           .order('meaning_added_at', { ascending: true });
         const map: Record<string, string> = {};
         const multi: Record<string, string[]> = {};
+        const exMap: Record<string, string> = {};
         (m as any[] | null)?.forEach((row) => {
           if (!map[row.word_id]) map[row.word_id] = row.meaning;
           if (!multi[row.word_id]) multi[row.word_id] = [];
           multi[row.word_id].push(row.meaning);
+          if (!exMap[row.word_id] && row.example_sentence && String(row.example_sentence).trim() !== '') {
+            exMap[row.word_id] = row.example_sentence as string;
+          }
         });
         setMeanings(map);
         setAllMeanings(multi);
+        setExamples(exMap);
       }
       setLoading(false);
     })();
@@ -236,6 +243,7 @@ export default function PracticePage() {
     setAttempts(0);
     setMessage('');
     setAnswered(false);
+    setShowExample(false);
     setTimeout(() => focusAndCenterInput(), 0);
   }, [idx]);
 
@@ -308,6 +316,7 @@ export default function PracticePage() {
     if (isCorrect) {
       setMessage('✅ Chính xác!');
       setAnswered(true);
+      setShowExample(true);
       // Save result
       setPracticeResults(prev => [...prev, { word: current, userAnswer: input.trim(), correct: true, attempts: attempts + 1 }]);
       
@@ -354,6 +363,7 @@ export default function PracticePage() {
     const answer = currentMode === 'en2vi' ? (allMeanings[current.word_id]?.[0] || '') : current.text;
     setMessage(`❌ Sai. Đáp án: ${answer}`);
     setAnswered(true);
+    setShowExample(true);
     
     // Save result
     setPracticeResults(prev => [...prev, { word: current, userAnswer: input.trim(), correct: false, attempts: attempts + 1 }]);
@@ -423,6 +433,7 @@ export default function PracticePage() {
         setInput(prevResult.userAnswer);
         setAnswered(true);
         setIsReviewMode(true);
+        setShowExample(true);
         // Enhanced message showing all details
         const prevMode = direction === 'random' ? (modes[newIdx] || 'en2vi') : direction;
         const correctAnswer = prevMode === 'en2vi' ? (allMeanings[prevResult.word.word_id]?.[0] || '') : prevResult.word.text;
@@ -598,19 +609,24 @@ export default function PracticePage() {
                   const allWordIds = base.map(w => w.word_id);
                   const { data: m } = await supabase
                     .from('wordmeanings')
-                    .select('word_id,meaning')
+                    .select('word_id,meaning,example_sentence')
                     .in('word_id', allWordIds)
                     .order('meaning_added_at', { ascending: true });
                   
                   const meaningMap: Record<string, string> = {};
                   const allMeaningsMap: Record<string, string[]> = {};
+                  const exampleMap: Record<string, string> = {};
                   (m as any[] | null)?.forEach((row) => {
                     if (!meaningMap[row.word_id]) meaningMap[row.word_id] = row.meaning;
                     if (!allMeaningsMap[row.word_id]) allMeaningsMap[row.word_id] = [];
                     allMeaningsMap[row.word_id].push(row.meaning);
+                    if (!exampleMap[row.word_id] && row.example_sentence && String(row.example_sentence).trim() !== '') {
+                      exampleMap[row.word_id] = row.example_sentence as string;
+                    }
                   });
                   setMeanings(meaningMap);
                   setAllMeanings(allMeaningsMap);
+                  setExamples(exampleMap);
                   
                   let needed = Math.max(questionCount, base.length);
                   const seq: Word[] = [];
@@ -762,7 +778,7 @@ export default function PracticePage() {
                               </audio>
                             </div>
                           ) : (
-                            <audio controls className="h-10 w-full max-w-xs sm:max-w-sm mx-auto">
+                            <audio controls className="h-10 w-full max-w-xl md:max-w-2xl lg:max-w-3xl mx-auto">
                               <source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} />
                             </audio>
                           )
@@ -778,6 +794,15 @@ export default function PracticePage() {
                   )}
                 </div>
               </div>
+
+              {/* Example area (shows after 2 wrong attempts or on correct) */}
+              {current && showExample && examples[current.word_id] && (
+                <div className="px-2 sm:px-6 -mt-1 sm:-mt-2 mb-3 sm:mb-4">
+                  <div className="rounded-lg border bg-neutral-50 dark:bg-neutral-800/40 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-200 text-center">
+                    <span className="font-medium">Ví dụ:</span> {examples[current.word_id]}
+                  </div>
+                </div>
+              )}
 
               {/* Input area */}
               <div className="mb-3 sm:mb-6">
