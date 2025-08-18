@@ -285,6 +285,47 @@ export default function LectureWordsPage() {
     }
   };
 
+  // Fallback IPA from Datamuse (ARPAbet → IPA)
+  const ARPABET_TO_IPA: Record<string, string> = {
+    AA: 'ɑ', AE: 'æ', AH: 'ʌ', AO: 'ɔ', AW: 'aʊ', AY: 'aɪ',
+    B: 'b', CH: 'tʃ', D: 'd', DH: 'ð', EH: 'ɛ', ER: 'ɝ', EY: 'eɪ',
+    F: 'f', G: 'ɡ', HH: 'h', IH: 'ɪ', IY: 'i', JH: 'dʒ', K: 'k', L: 'l', M: 'm',
+    N: 'n', NG: 'ŋ', OW: 'oʊ', OY: 'ɔɪ', P: 'p', R: 'ɹ', S: 's', SH: 'ʃ', T: 't',
+    TH: 'θ', UH: 'ʊ', UW: 'u', V: 'v', W: 'w', Y: 'j', Z: 'z', ZH: 'ʒ'
+  };
+  const isVowelPhoneme = (ph: string) => /^(AA|AE|AH|AO|AW|AY|EH|ER|EY|IH|IY|OW|OY|UH|UW)$/i.test(ph);
+  const arpabetToIpa = (arpabet: string): string => {
+    const parts = arpabet.trim().split(/\s+/).filter(Boolean);
+    const out: string[] = [];
+    for (const p of parts) {
+      const m = p.match(/^([A-Z]+)([0-2])?$/i);
+      if (!m) continue;
+      const base = (m[1] || '').toUpperCase();
+      const stress = m[2] || '';
+      let ipa = ARPABET_TO_IPA[base] || '';
+      if (ipa && stress) {
+        const mark = stress === '1' ? 'ˈ' : (stress === '2' ? 'ˌ' : '');
+        if (isVowelPhoneme(base)) ipa = mark + ipa; else out.push(mark);
+      }
+      out.push(ipa);
+    }
+    return out.join('');
+  };
+  const fetchIpaFromDatamuse = async (word: string): Promise<string | null> => {
+    try {
+      const res = await fetch(`https://api.datamuse.com/words?sp=${encodeURIComponent(word)}&md=r&max=1`);
+      const data = await res.json();
+      const tags: string[] = (data?.[0]?.tags || []) as any;
+      const pronTag = (tags || []).find((t) => typeof t === 'string' && t.startsWith('pron:')) as string | undefined;
+      const arpabet = pronTag ? pronTag.slice(5) : '';
+      if (!arpabet) return null;
+      return arpabetToIpa(arpabet);
+    } catch {
+      return null;
+    }
+  };
+  const youdaoAudioUrl = (word: string): string => `https://dict.youdao.com/dictvoice?type=2&audio=${encodeURIComponent(word)}`;
+
   function encodeWav(buffer: AudioBuffer): Blob {
     const numOfChan = 1;
     const sampleRate = buffer.sampleRate;
@@ -400,7 +441,13 @@ export default function LectureWordsPage() {
       }
     }
 
-    // 4) As a last resort, use a Datamuse suggestion (may return a phrase)
+    // 4) Fallback: if IPA missing, try Datamuse ARPAbet → IPA for original text
+    try {
+      const ipaFm = await fetchIpaFromDatamuse(text);
+      if (ipaFm) return { ipa: ipaFm } as DictResult;
+    } catch {}
+
+    // 5) As a last resort, use a Datamuse suggestion (may return a phrase)
     try {
       const sres = await fetch(`https://api.datamuse.com/sug?s=${encodeURIComponent(text)}`);
       const sdata = await sres.json();
@@ -408,6 +455,8 @@ export default function LectureWordsPage() {
       if (suggestion) {
         const sug = (await fetchOnce(suggestion)) || undefined;
         if (sug) return sug;
+        const ipa2 = await fetchIpaFromDatamuse(suggestion);
+        if (ipa2) return { ipa: ipa2 } as DictResult;
       }
     } catch {}
 
@@ -445,12 +494,16 @@ export default function LectureWordsPage() {
       }
       setFetchingDict(true);
       await fetchTextSuggestions(t);
-      const dict = await fetchDictionary(t);
+      let dict = await fetchDictionary(t);
+      // If IPA is missing, try Datamuse fallback; if audio missing for single word, try Youdao TTS
+      if (!dict.ipa) {
+        try { const ipaFm = await fetchIpaFromDatamuse(t); if (ipaFm) dict = { ...dict, ipa: ipaFm }; } catch {}
+      }
       if (cancelled) return;
       setForm((f) => ({
         ...f,
         ipa: dict.ipa ?? '',
-        audioPath: dict.audio ?? null,
+        audioPath: (!dict.audio && !/[\s-]/.test(t)) ? youdaoAudioUrl(t) : (dict.audio ?? null),
       }));
       // Build suggestions: 3 vi + 2 en
       const enDefs = (dict.meanings || []).map((m) => m.meaning);
