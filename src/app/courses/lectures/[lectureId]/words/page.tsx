@@ -247,8 +247,9 @@ export default function LectureWordsPage() {
       const buffers: AudioBuffer[] = [];
       for (const tk of tokens) {
         const r = await fetchDictionary(tk);
-        if (!r.audio) continue;
-        const resp = await fetch(r.audio);
+        const src = r.audio || youdaoAudioUrl(tk) || null;
+        if (!src) continue;
+        const resp = await fetch(src);
         if (!resp.ok) continue;
         const arr = await resp.arrayBuffer();
         const buf = await decodeCtx.decodeAudioData(arr.slice(0));
@@ -324,7 +325,7 @@ export default function LectureWordsPage() {
       return null;
     }
   };
-  const youdaoAudioUrl = (word: string): string => `https://dict.youdao.com/dictvoice?type=2&audio=${encodeURIComponent(word)}`;
+  const youdaoAudioUrl = (word: string): string => `/api/tts/youdao?text=${encodeURIComponent(word)}`;
 
   function encodeWav(buffer: AudioBuffer): Blob {
     const numOfChan = 1;
@@ -514,6 +515,47 @@ export default function LectureWordsPage() {
       if (!dict.audio && /[\s-]/.test(t)) {
         const path = await composePhraseAudio(t);
         if (!cancelled && path) setForm((f) => ({ ...f, audioPath: path }));
+        // If composition failed, try concatenating Youdao TTS per token as fallback
+        if (!cancelled && !path) {
+          const tokens = t.split(/[\s-]+/).filter(Boolean).slice(0, 6);
+          const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+          try {
+            const ctx: AudioContext = new AC();
+            const sampleRate = 44100; const gapSec = 0.12;
+            const buffers: AudioBuffer[] = [];
+            for (const tk of tokens) {
+              try {
+                const res = await fetch(youdaoAudioUrl(tk));
+                if (!res.ok) continue;
+                const arr = await res.arrayBuffer();
+                const buf = await ctx.decodeAudioData(arr.slice(0));
+                const mono = ctx.createBuffer(1, buf.length, buf.sampleRate);
+                mono.copyToChannel(buf.getChannelData(0), 0);
+                buffers.push(mono);
+              } catch {}
+            }
+            ctx.close();
+            if (buffers.length > 0) {
+              const totalSeconds = buffers.reduce((s, b) => s + b.duration, 0) + gapSec * (buffers.length - 1);
+              const totalFrames = Math.ceil(totalSeconds * sampleRate);
+              const offline = new (window as any).OfflineAudioContext(1, totalFrames, sampleRate);
+              let t0 = 0;
+              for (const b of buffers) {
+                const src = offline.createBufferSource();
+                const buf = offline.createBuffer(1, Math.floor(b.duration * sampleRate), sampleRate);
+                buf.copyToChannel(b.getChannelData(0), 0);
+                src.buffer = buf;
+                src.connect(offline.destination);
+                src.start(t0);
+                t0 += buf.duration + gapSec;
+              }
+              const rendered = await offline.startRendering();
+              const wavBlob = encodeWav(rendered);
+              const url = URL.createObjectURL(wavBlob);
+              if (!cancelled) setForm((f) => ({ ...f, audioPath: url }));
+            }
+          } catch {}
+        }
       }
       setFetchingDict(false);
     }, 500);
