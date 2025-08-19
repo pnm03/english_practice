@@ -707,7 +707,7 @@ export default function PracticePage() {
             </div>
           </div>
         ) : (
-        <div className="max-w-2xl mx-auto px-2 sm:px-4">
+        <div className="max-w-3xl mx-auto px-2 sm:px-4">
           {/* Header card with progress */}
           <div className="bg-white dark:bg-neutral-900 rounded-lg sm:rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-700 p-3 sm:p-6 mb-4 sm:mb-6">
             <div className="flex items-center justify-between mb-4">
@@ -778,7 +778,7 @@ export default function PracticePage() {
                               </audio>
                             </div>
                           ) : (
-                            <audio controls className="h-10 w-full max-w-xl md:max-w-2xl lg:max-w-3xl mx-auto">
+                            <audio controls className="h-10 w-full max-w-full mx-auto">
                               <source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} />
                             </audio>
                           )

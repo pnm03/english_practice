@@ -567,6 +567,20 @@ export default function LectureWordsPage() {
   const removeMeaning = (idx: number) => setForm((f) => ({ ...f, meanings: f.meanings.filter((_, i) => i !== idx) }));
   const updateMeaning = (idx: number, value: string) => setForm((f) => ({ ...f, meanings: f.meanings.map((m, i) => (i === idx ? { ...m, meaning: value } : m)) }));
   const updateMeaningExample = (idx: number, value: string) => setForm((f) => ({ ...f, meanings: f.meanings.map((m, i) => (i === idx ? { ...m, example_sentence: value } : m)) }));
+  const splitMeaningListAt = (idx: number) => setForm((f) => {
+    const current = f.meanings[idx];
+    if (!current) return f;
+    const raw = (current.meaning || '').trim();
+    const parts = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+    if (parts.length <= 1) return f;
+    const next = [...f.meanings];
+    // Replace current with first item
+    next[idx] = { ...current, meaning: parts[0] };
+    // Insert the rest right after, empty example by default
+    const extras: MeaningItem[] = parts.slice(1).map((p) => ({ meaning: p }));
+    next.splice(idx + 1, 0, ...extras);
+    return { ...f, meanings: next };
+  });
 
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -875,7 +889,7 @@ export default function LectureWordsPage() {
                   {form.meanings.map((m, idx) => (
                     <div key={idx} className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <input value={m.meaning} onChange={(e) => updateMeaning(idx, e.target.value)} placeholder={`Nghĩa #${idx + 1}`} disabled={!!editing && !editMode} className="flex-1 rounded-md border px-3 py-2 bg-transparent" />
+                        <input value={m.meaning} onChange={(e) => updateMeaning(idx, e.target.value)} onBlur={() => splitMeaningListAt(idx)} placeholder={`Nghĩa #${idx + 1}`} disabled={!!editing && !editMode} className="flex-1 rounded-md border px-3 py-2 bg-transparent" />
                         <button type="button" onClick={() => removeMeaning(idx)} disabled={!!editing && !editMode} className="text-xs border rounded px-2 py-1">Xóa</button>
                       </div>
                       <input value={m.example_sentence || ''} onChange={(e) => updateMeaningExample(idx, e.target.value)} placeholder="Ví dụ minh họa (không bắt buộc)" disabled={!!editing && !editMode} className="w-full rounded-md border px-3 py-2 bg-transparent" />
