@@ -122,6 +122,9 @@ export default function PracticePage() {
   const [showResults, setShowResults] = useState(false);
   const [isReviewMode, setIsReviewMode] = useState(false);
   const [currentProgressIdx, setCurrentProgressIdx] = useState(0); // Track actual progress (max index reached)
+  const [repeatWrongOnce, setRepeatWrongOnce] = useState<boolean>(false);
+  const [scheduledRepeatWordId, setScheduledRepeatWordId] = useState<string | null>(null);
+  const [isRepeatingCurrent, setIsRepeatingCurrent] = useState<boolean>(false);
 
   const toPublicUrl = (p: string | null | undefined, bucket: string) => {
     if (!p) return null;
@@ -274,6 +277,7 @@ export default function PracticePage() {
     if (typeof window !== 'undefined') {
       const savedShuffle = localStorage.getItem('practice-shuffle');
       const savedDirection = localStorage.getItem('practice-direction');
+      const savedRepeat = localStorage.getItem('practice-repeat-once');
       
       if (savedShuffle !== null) {
         setShuffle(savedShuffle === 'true');
@@ -281,6 +285,9 @@ export default function PracticePage() {
       
       if (savedDirection && ['vi2en', 'en2vi', 'random'].includes(savedDirection)) {
         setDirection(savedDirection as 'vi2en' | 'en2vi' | 'random');
+      }
+      if (savedRepeat !== null) {
+        setRepeatWrongOnce(savedRepeat === 'true');
       }
     }
   }, []);
@@ -308,17 +315,53 @@ export default function PracticePage() {
 
     // Direction check - use fixed mode for each question
     const mode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
-    const isCorrect = mode === 'vi2en'
-      ? value === target  // vi2en: hiển thị tiếng Việt (meaning), nhập tiếng Anh (target)
-      : (allMeanings[current.word_id] || []).some((m) => {
-          // Strict equality (no substring). Accept either exact with accents or exact without accents.
-          const meaningNorm = normalizeForCompare(m);
-          const valueNorm = normalizeForCompare(value);
-          if (meaningNorm === valueNorm) return true; // exact (with accents normalized for spaces/case)
-          const meaningNoAccent = normalizeForCompare(removeVietnameseAccents(m));
-          const valueNoAccent = normalizeForCompare(removeVietnameseAccents(value));
-          return meaningNoAccent === valueNoAccent;
-        }); // en2vi: hiển thị tiếng Anh (target), nhập tiếng Việt (meaning)
+    const computeIsCorrect = () => {
+      return mode === 'vi2en'
+        ? value === target
+        : (allMeanings[current.word_id] || []).some((m) => {
+            const meaningNorm = normalizeForCompare(m);
+            const valueNorm = normalizeForCompare(value);
+            if (meaningNorm === valueNorm) return true; // exact normalized
+            const meaningNoAccent = normalizeForCompare(removeVietnameseAccents(m));
+            const valueNoAccent = normalizeForCompare(removeVietnameseAccents(value));
+            return meaningNoAccent === valueNoAccent;
+          });
+    };
+
+    // Repeat phase: single attempt only
+    if (isRepeatingCurrent) {
+      const isCorrect = computeIsCorrect();
+      if (isCorrect) {
+        setMessage('✅ Chính xác!');
+        setAnswered(true);
+        setShowExample(true);
+        setPracticeResults(prev => [...prev, { word: current, userAnswer: input.trim(), correct: true, attempts: 1 }]);
+        if (idx + 1 >= total) {
+          setTimeout(() => setShowResults(true), 600);
+          return;
+        }
+        if (autoNext) setTimeout(() => {
+          setIsRepeatingCurrent(false);
+          setIdx((p) => p + 1);
+          setCurrentProgressIdx((p) => Math.max(p, idx + 1));
+          setInput('');
+          setAnswered(false);
+          setAttempts(0);
+          setMessage('');
+          setTimeout(() => focusAndCenterInput(), 0);
+        }, 600);
+        return;
+      }
+      const ans = mode === 'en2vi' ? (allMeanings[current.word_id]?.[0] || '') : current.text;
+      setMessage(`❌ Sai. Đáp án: ${ans}`);
+      setAnswered(true);
+      setShowExample(true);
+      setAttempts(1);
+      setPracticeResults(prev => [...prev, { word: current, userAnswer: input.trim(), correct: false, attempts: 1 }]);
+      return;
+    }
+
+    const isCorrect = computeIsCorrect();
 
     if (isCorrect) {
       setMessage('✅ Chính xác!');
@@ -371,6 +414,9 @@ export default function PracticePage() {
     setMessage(`❌ Sai. Đáp án: ${answer}`);
     setAnswered(true);
     setShowExample(true);
+    if (repeatWrongOnce) {
+      setScheduledRepeatWordId(current.word_id);
+    }
     
     // Save result
     setPracticeResults(prev => [...prev, { word: current, userAnswer: input.trim(), correct: false, attempts: attempts + 1 }]);
@@ -417,6 +463,34 @@ export default function PracticePage() {
     }
     
     // Normal next logic
+    // If repeat is scheduled for current word, start repeat instead of advancing
+    if (scheduledRepeatWordId && current && current.word_id === scheduledRepeatWordId && repeatWrongOnce) {
+      setIsRepeatingCurrent(true);
+      setScheduledRepeatWordId(null);
+      setInput('');
+      setAnswered(false);
+      setAttempts(0);
+      setShowExample(false);
+      setMessage('Luyện lại từ vừa sai (1 lần)');
+      setTimeout(() => focusAndCenterInput(), 0);
+      return;
+    }
+    // If we were repeating and user chose to go next, proceed to next word
+    if (isRepeatingCurrent) {
+      setIsRepeatingCurrent(false);
+      if (idx + 1 >= total) {
+        setShowResults(true);
+        return;
+      }
+      setIdx((p) => p + 1);
+      setCurrentProgressIdx((p) => Math.max(p, idx + 1));
+      setInput('');
+      setAnswered(false);
+      setAttempts(0);
+      setMessage('');
+      setTimeout(() => inputRef.current?.focus(), 0);
+      return;
+    }
     if (idx + 1 >= total) {
       setShowResults(true);
       return;
@@ -738,10 +812,16 @@ export default function PracticePage() {
                   return `${titles.length} bài giảng`;
                 })()} • {total} từ
               </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={autoNext} onChange={(e)=>setAutoNext(e.target.checked)} className="rounded" />
-                <span className="hidden sm:inline text-neutral-600 dark:text-neutral-400">Auto next</span>
-              </label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={repeatWrongOnce} onChange={(e)=>{ setRepeatWrongOnce(e.target.checked); if (typeof window !== 'undefined') localStorage.setItem('practice-repeat-once', e.target.checked.toString()); }} className="rounded" />
+                  <span className="hidden sm:inline text-neutral-600 dark:text-neutral-400">Luyện lại khi sai (1 lần)</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={autoNext} onChange={(e)=>setAutoNext(e.target.checked)} className="rounded" />
+                  <span className="hidden sm:inline text-neutral-600 dark:text-neutral-400">Auto next</span>
+                </label>
+              </div>
             </div>
             
             {/* Progress bar */}
