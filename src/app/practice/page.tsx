@@ -125,6 +125,8 @@ export default function PracticePage() {
   const [repeatWrongOnce, setRepeatWrongOnce] = useState<boolean>(false);
   const [scheduledRepeatWordId, setScheduledRepeatWordId] = useState<string | null>(null);
   const [isRepeatingCurrent, setIsRepeatingCurrent] = useState<boolean>(false);
+  const [optionsOpen, setOptionsOpen] = useState<boolean>(false);
+  const optionsRef = useRef<HTMLDivElement | null>(null);
 
   const toPublicUrl = (p: string | null | undefined, bucket: string) => {
     if (!p) return null;
@@ -291,6 +293,20 @@ export default function PracticePage() {
       }
     }
   }, []);
+
+  // Close options dropdown when clicking outside
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!optionsRef.current) return;
+      if (!optionsRef.current.contains(e.target as Node)) setOptionsOpen(false);
+    };
+    if (optionsOpen && typeof document !== 'undefined') {
+      document.addEventListener('mousedown', onDocClick);
+    }
+    return () => {
+      if (typeof document !== 'undefined') document.removeEventListener('mousedown', onDocClick);
+    };
+  }, [optionsOpen]);
 
   // Save preferences to localStorage when they change
   const handleShuffleChange = (newShuffle: boolean) => {
@@ -812,15 +828,43 @@ export default function PracticePage() {
                   return `${titles.length} bài giảng`;
                 })()} • {total} từ
               </div>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={repeatWrongOnce} onChange={(e)=>{ setRepeatWrongOnce(e.target.checked); if (typeof window !== 'undefined') localStorage.setItem('practice-repeat-once', e.target.checked.toString()); }} className="rounded" />
-                  <span className="hidden sm:inline text-neutral-600 dark:text-neutral-400">Luyện lại khi sai (1 lần)</span>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={autoNext} onChange={(e)=>setAutoNext(e.target.checked)} className="rounded" />
-                  <span className="hidden sm:inline text-neutral-600 dark:text-neutral-400">Auto next</span>
-                </label>
+              <div className="relative" ref={optionsRef}>
+                <button
+                  type="button"
+                  onClick={() => setOptionsOpen((o)=>!o)}
+                  aria-label="Tùy chọn"
+                  title="Tùy chọn"
+                  className="inline-flex items-center justify-center p-1.5 rounded-full border bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7z" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .69.28 1.35.78 1.82.5.47 1.2.74 1.91.68H21a2 2 0 1 1 0 4h-.09c-.71-.06-1.41.21-1.91.68-.5.47-.78 1.13-.78 1.82z" />
+                  </svg>
+                </button>
+                {optionsOpen && (
+                  <div className="absolute right-0 mt-2 w-64 rounded-lg border bg-white dark:bg-neutral-900 shadow-lg z-20 p-3">
+                    <div className="flex items-center justify-between gap-3 py-1.5">
+                      <div className="text-sm text-neutral-700 dark:text-neutral-200">Luyện lại khi sai (1 lần)</div>
+                      <button
+                        type="button"
+                        onClick={() => { const v = !repeatWrongOnce; setRepeatWrongOnce(v); if (typeof window !== 'undefined') localStorage.setItem('practice-repeat-once', v.toString()); }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${repeatWrongOnce ? 'bg-blue-600' : 'bg-neutral-300 dark:bg-neutral-700'}`}
+                      >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${repeatWrongOnce ? 'translate-x-5' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 py-1.5">
+                      <div className="text-sm text-neutral-700 dark:text-neutral-200">Auto next</div>
+                      <button
+                        type="button"
+                        onClick={() => setAutoNext((v)=>!v)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoNext ? 'bg-blue-600' : 'bg-neutral-300 dark:bg-neutral-700'}`}
+                      >
+                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${autoNext ? 'translate-x-5' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             
