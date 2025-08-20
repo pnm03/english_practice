@@ -264,6 +264,11 @@ export default function PracticePage() {
       .toLowerCase();
   };
 
+  // Normalize text for strict comparison: trim, lowercase, collapse spaces
+  const normalizeForCompare = (str: string) => {
+    return str.trim().toLowerCase().replace(/\s+/g, ' ');
+  };
+
   // Load preferences from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -306,11 +311,13 @@ export default function PracticePage() {
     const isCorrect = mode === 'vi2en'
       ? value === target  // vi2en: hiển thị tiếng Việt (meaning), nhập tiếng Anh (target)
       : (allMeanings[current.word_id] || []).some((m) => {
-          const meaning = m.trim().toLowerCase();
-          // Check exact match first
-          if (meaning.includes(value)) return true;
-          // Check without accents
-          return removeVietnameseAccents(meaning).includes(removeVietnameseAccents(value));
+          // Strict equality (no substring). Accept either exact with accents or exact without accents.
+          const meaningNorm = normalizeForCompare(m);
+          const valueNorm = normalizeForCompare(value);
+          if (meaningNorm === valueNorm) return true; // exact (with accents normalized for spaces/case)
+          const meaningNoAccent = normalizeForCompare(removeVietnameseAccents(m));
+          const valueNoAccent = normalizeForCompare(removeVietnameseAccents(value));
+          return meaningNoAccent === valueNoAccent;
         }); // en2vi: hiển thị tiếng Anh (target), nhập tiếng Việt (meaning)
 
     if (isCorrect) {
@@ -580,6 +587,19 @@ export default function PracticePage() {
                 <label className="block text-sm mb-1">Số câu hỏi</label>
                 <input type="number" min={Math.max(1,totalWordsSelected)} value={questionCount || 0} onChange={(e)=> setQuestionCount(parseInt(e.target.value || '0',10))} className="border rounded px-3 py-2 w-full" />
                 <div className="text-xs text-neutral-500 mt-1">Tối thiểu: {totalWordsSelected}. Nếu nhập nhiều hơn, hệ thống sẽ lặp từ để đủ số câu.</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[1, 1.5, 2, 2.5, 3].map((factor) => (
+                    <button
+                      key={factor}
+                      type="button"
+                      disabled={totalWordsSelected === 0}
+                      onClick={() => setQuestionCount(Math.round(totalWordsSelected * factor))}
+                      className={`px-3 py-1.5 rounded border text-sm ${totalWordsSelected===0 ? 'text-neutral-400 bg-neutral-100 cursor-not-allowed' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}
+                    >
+                      {`x${factor}`}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <div className="text-sm font-medium mb-1">Kiểu sắp xếp</div>
