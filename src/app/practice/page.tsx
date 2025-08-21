@@ -127,6 +127,7 @@ export default function PracticePage() {
   const [isRepeatingCurrent, setIsRepeatingCurrent] = useState<boolean>(false);
   const [optionsOpen, setOptionsOpen] = useState<boolean>(false);
   const optionsRef = useRef<HTMLDivElement | null>(null);
+  const [hydrated, setHydrated] = useState<boolean>(false);
 
   const toPublicUrl = (p: string | null | undefined, bucket: string) => {
     if (!p) return null;
@@ -219,6 +220,23 @@ export default function PracticePage() {
       });
       setWordsByLecture(map);
       setLoadingLectures(false);
+      // Rehydrate selections after data is available (in case of navigation back)
+      if (typeof window !== 'undefined') {
+        try {
+          const savedLectures = localStorage.getItem('practice-lectures');
+          if (savedLectures && selectedLectures.size === 0) {
+            const arr = JSON.parse(savedLectures) as string[];
+            setSelectedLectures(new Set(arr));
+          }
+          const savedExplicit = localStorage.getItem('practice-explicit');
+          if (savedExplicit !== null) setExplicitSelect(savedExplicit === 'true');
+          const savedWordIds = localStorage.getItem('practice-word-ids');
+          if (savedWordIds && selectedWordIds.size === 0) {
+            const ids = JSON.parse(savedWordIds) as string[];
+            setSelectedWordIds(new Set(ids));
+          }
+        } catch {}
+      }
     })();
   }, [selectedCourse, supabase]);
 
@@ -316,6 +334,7 @@ export default function PracticePage() {
       if (savedWordIds) {
         try { const arr = JSON.parse(savedWordIds) as string[]; setSelectedWordIds(new Set(arr)); } catch {}
       }
+      setHydrated(true);
     }
   }, []);
 
@@ -350,24 +369,35 @@ export default function PracticePage() {
 
   // Persist selected course/lectures/word selections
   useEffect(() => {
+    if (!hydrated) return;
     if (typeof window !== 'undefined') {
-      localStorage.setItem('practice-course', selectedCourse ?? '');
+      if (selectedCourse) {
+        localStorage.setItem('practice-course', selectedCourse);
+      }
     }
-  }, [selectedCourse]);
+  }, [selectedCourse, hydrated]);
   useEffect(() => {
+    if (!hydrated) return;
     if (typeof window !== 'undefined') {
       localStorage.setItem('practice-lectures', JSON.stringify(Array.from(selectedLectures)));
     }
-  }, [selectedLectures]);
+  }, [selectedLectures, hydrated]);
   useEffect(() => {
+    if (!hydrated) return;
     if (typeof window !== 'undefined') {
       localStorage.setItem('practice-explicit', explicitSelect.toString());
     }
-  }, [explicitSelect]);
+  }, [explicitSelect, hydrated]);
   useEffect(() => {
+    if (!hydrated) return;
     if (typeof window !== 'undefined') {
       localStorage.setItem('practice-word-ids', JSON.stringify(Array.from(selectedWordIds)));
     }
+  }, [selectedWordIds, hydrated]);
+
+  // Initialize questionCount from selected words when restored from storage
+  useEffect(() => {
+    setQuestionCount(selectedWordIds.size);
   }, [selectedWordIds]);
 
   const onSubmit = async () => {
@@ -596,7 +626,7 @@ export default function PracticePage() {
   };
 
   const totalWordsSelected = Array.from(selectedLectures).reduce((sum, lid) => sum + (wordsByLecture[lid]?.length || 0), 0);
-  const effectiveSelectedCount = explicitSelect ? selectedWordIds.size : totalWordsSelected;
+  const effectiveSelectedCount = selectedWordIds.size;
   useEffect(() => {
     // enforce min number
     if (totalWordsSelected > 0 && questionCount < totalWordsSelected) setQuestionCount(totalWordsSelected);
@@ -693,7 +723,7 @@ export default function PracticePage() {
               <div>
                 <div className="text-xl font-semibold mb-2">Chọn Bộ Luyện Tập</div>
                 <label className="block text-sm mb-1">Chọn khóa lớn:</label>
-                <select className="border rounded px-3 py-2 w-full" value={selectedCourse ?? ''} onChange={(e)=>{ const val = e.target.value || null; setSelectedCourse(val); setSelectedLectures(new Set()); setSelectedWordIds(new Set()); setExplicitSelect(false); const found = courses.find((c:any)=>c.course_id===val); setSelectedCourseName(found?.name || ''); }}>
+                <select className="border rounded px-3 py-2 w-full" value={selectedCourse ?? ''} onChange={(e)=>{ const val = e.target.value || null; setSelectedCourse(val); setSelectedLectures(new Set()); setSelectedWordIds(new Set()); setExplicitSelect(false); setQuestionCount(0); const found = courses.find((c:any)=>c.course_id===val); setSelectedCourseName(found?.name || ''); }}>
                   <option value="">-- Chọn khóa học --</option>
                   {courses.map((c)=> (
                     <option key={c.course_id} value={c.course_id}>{c.name} ({courseLectureCounts[c.course_id] || 0} bài giảng)</option>
@@ -714,6 +744,7 @@ export default function PracticePage() {
                           setSelectedLectures(s);
                           // Reset selected words when lecture toggled
                           setSelectedWordIds(new Set());
+                          setQuestionCount(0);
                         }} />
                         <span>{l.title} ({count} từ)</span>
                       </label>
@@ -723,7 +754,7 @@ export default function PracticePage() {
               </div>
               <div>
                 <label className="block text-sm mb-1">Số câu hỏi</label>
-                <input type="number" min={Math.max(1,effectiveSelectedCount)} value={questionCount || 0} onChange={(e)=> setQuestionCount(parseInt(e.target.value || '0',10))} className="border rounded px-3 py-2 w-full" />
+                <input type="number" min={Math.max(1,effectiveSelectedCount)} value={questionCount || effectiveSelectedCount || 0} onChange={(e)=> setQuestionCount(parseInt(e.target.value || '0',10))} className="border rounded px-3 py-2 w-full" />
                 <div className="text-xs text-neutral-500 mt-1">Tối thiểu: {effectiveSelectedCount}. Nếu nhập nhiều hơn, hệ thống sẽ lặp từ để đủ số câu.</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {[1, 1.5, 2, 2.5, 3].map((factor) => (
@@ -829,17 +860,23 @@ export default function PracticePage() {
                           const allIds: string[] = Array.from(selectedLectures).flatMap((lid)=> (wordsByLecture[lid] || []).map((x)=> x.word_id));
                           setSelectedWordIds(new Set(allIds));
                           setExplicitSelect(true);
+                          setQuestionCount(allIds.length);
                         }}
-                        className="px-3 py-1.5 text-sm rounded border hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                      >Chọn tất cả</button>
+                        className="px-2 py-1.5 text-sm rounded border hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        title="Chọn tất cả"
+                        aria-label="Chọn tất cả"
+                      >✅</button>
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedWordIds(new Set());
                           setExplicitSelect(true);
+                          setQuestionCount(0);
                         }}
-                        className="px-3 py-1.5 text-sm rounded border hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                      >Bỏ chọn tất cả</button>
+                        className="px-2 py-1.5 text-sm rounded border hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        title="Bỏ chọn tất cả"
+                        aria-label="Bỏ chọn tất cả"
+                      >❌</button>
                     </div>
                   )}
                 </div>
@@ -864,6 +901,9 @@ export default function PracticePage() {
                                 }
                                 if (e.target.checked) s.add(w.word_id); else s.delete(w.word_id);
                                 setSelectedWordIds(s);
+                                // Update default question count to current selection size (>=1)
+                                const count = Math.max(Array.from(s).length, 1);
+                                setQuestionCount(count);
                               }} />{w.text}</label>
                             </li>
                           );
