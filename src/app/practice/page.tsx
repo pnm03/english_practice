@@ -627,10 +627,6 @@ export default function PracticePage() {
 
   const totalWordsSelected = Array.from(selectedLectures).reduce((sum, lid) => sum + (wordsByLecture[lid]?.length || 0), 0);
   const effectiveSelectedCount = selectedWordIds.size;
-  useEffect(() => {
-    // enforce min number
-    if (totalWordsSelected > 0 && questionCount < totalWordsSelected) setQuestionCount(totalWordsSelected);
-  }, [totalWordsSelected]);
 
   return (
     <div className="p-6 space-y-4">
