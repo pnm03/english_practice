@@ -181,6 +181,14 @@ export default function PracticePage() {
       const counts: Record<string, number> = {};
       (lc as any[] || []).forEach((r: any) => { counts[r.course_id] = (counts[r.course_id] || 0) + 1; });
       setCourseLectureCounts(counts);
+      // If we already have a selected course id, set its name
+      if (typeof window !== 'undefined') {
+        const savedCourse = localStorage.getItem('practice-course');
+        if (savedCourse) {
+          const found = ((cs as any[]) || []).find((c:any)=> c.course_id === savedCourse);
+          if (found) setSelectedCourseName(found.name);
+        }
+      }
     })();
   }, [supabase]);
 
@@ -280,6 +288,10 @@ export default function PracticePage() {
       const savedShuffle = localStorage.getItem('practice-shuffle');
       const savedDirection = localStorage.getItem('practice-direction');
       const savedRepeat = localStorage.getItem('practice-repeat-once');
+      const savedCourse = localStorage.getItem('practice-course');
+      const savedLectures = localStorage.getItem('practice-lectures');
+      const savedExplicit = localStorage.getItem('practice-explicit');
+      const savedWordIds = localStorage.getItem('practice-word-ids');
       
       if (savedShuffle !== null) {
         setShuffle(savedShuffle === 'true');
@@ -290,6 +302,19 @@ export default function PracticePage() {
       }
       if (savedRepeat !== null) {
         setRepeatWrongOnce(savedRepeat === 'true');
+      }
+
+      if (savedCourse) {
+        setSelectedCourse(savedCourse);
+      }
+      if (savedLectures) {
+        try { const arr = JSON.parse(savedLectures) as string[]; setSelectedLectures(new Set(arr)); } catch {}
+      }
+      if (savedExplicit !== null) {
+        setExplicitSelect(savedExplicit === 'true');
+      }
+      if (savedWordIds) {
+        try { const arr = JSON.parse(savedWordIds) as string[]; setSelectedWordIds(new Set(arr)); } catch {}
       }
     }
   }, []);
@@ -322,6 +347,28 @@ export default function PracticePage() {
       localStorage.setItem('practice-direction', newDirection);
     }
   };
+
+  // Persist selected course/lectures/word selections
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('practice-course', selectedCourse ?? '');
+    }
+  }, [selectedCourse]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('practice-lectures', JSON.stringify(Array.from(selectedLectures)));
+    }
+  }, [selectedLectures]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('practice-explicit', explicitSelect.toString());
+    }
+  }, [explicitSelect]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('practice-word-ids', JSON.stringify(Array.from(selectedWordIds)));
+    }
+  }, [selectedWordIds]);
 
   const onSubmit = async () => {
     if (!current) return;
@@ -549,6 +596,7 @@ export default function PracticePage() {
   };
 
   const totalWordsSelected = Array.from(selectedLectures).reduce((sum, lid) => sum + (wordsByLecture[lid]?.length || 0), 0);
+  const effectiveSelectedCount = explicitSelect ? selectedWordIds.size : totalWordsSelected;
   useEffect(() => {
     // enforce min number
     if (totalWordsSelected > 0 && questionCount < totalWordsSelected) setQuestionCount(totalWordsSelected);
@@ -645,7 +693,7 @@ export default function PracticePage() {
               <div>
                 <div className="text-xl font-semibold mb-2">Chọn Bộ Luyện Tập</div>
                 <label className="block text-sm mb-1">Chọn khóa lớn:</label>
-                <select className="border rounded px-3 py-2 w-full" value={selectedCourse ?? ''} onChange={(e)=>{ const val = e.target.value || null; setSelectedCourse(val); setSelectedLectures(new Set()); const found = courses.find((c:any)=>c.course_id===val); setSelectedCourseName(found?.name || ''); }}>
+                <select className="border rounded px-3 py-2 w-full" value={selectedCourse ?? ''} onChange={(e)=>{ const val = e.target.value || null; setSelectedCourse(val); setSelectedLectures(new Set()); setSelectedWordIds(new Set()); setExplicitSelect(false); const found = courses.find((c:any)=>c.course_id===val); setSelectedCourseName(found?.name || ''); }}>
                   <option value="">-- Chọn khóa học --</option>
                   {courses.map((c)=> (
                     <option key={c.course_id} value={c.course_id}>{c.name} ({courseLectureCounts[c.course_id] || 0} bài giảng)</option>
@@ -675,16 +723,16 @@ export default function PracticePage() {
               </div>
               <div>
                 <label className="block text-sm mb-1">Số câu hỏi</label>
-                <input type="number" min={Math.max(1,totalWordsSelected)} value={questionCount || 0} onChange={(e)=> setQuestionCount(parseInt(e.target.value || '0',10))} className="border rounded px-3 py-2 w-full" />
-                <div className="text-xs text-neutral-500 mt-1">Tối thiểu: {totalWordsSelected}. Nếu nhập nhiều hơn, hệ thống sẽ lặp từ để đủ số câu.</div>
+                <input type="number" min={Math.max(1,effectiveSelectedCount)} value={questionCount || 0} onChange={(e)=> setQuestionCount(parseInt(e.target.value || '0',10))} className="border rounded px-3 py-2 w-full" />
+                <div className="text-xs text-neutral-500 mt-1">Tối thiểu: {effectiveSelectedCount}. Nếu nhập nhiều hơn, hệ thống sẽ lặp từ để đủ số câu.</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {[1, 1.5, 2, 2.5, 3].map((factor) => (
                     <button
                       key={factor}
                       type="button"
-                      disabled={totalWordsSelected === 0}
-                      onClick={() => setQuestionCount(Math.round(totalWordsSelected * factor))}
-                      className={`px-3 py-1.5 rounded border text-sm ${totalWordsSelected===0 ? 'text-neutral-400 bg-neutral-100 cursor-not-allowed' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}
+                      disabled={effectiveSelectedCount === 0}
+                      onClick={() => setQuestionCount(Math.round(effectiveSelectedCount * factor))}
+                      className={`px-3 py-1.5 rounded border text-sm ${effectiveSelectedCount===0 ? 'text-neutral-400 bg-neutral-100 cursor-not-allowed' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800'}`}
                     >
                       {`x${factor}`}
                     </button>
@@ -704,7 +752,7 @@ export default function PracticePage() {
               </div>
                 <button
                 className="rounded bg-black text-white dark:bg-white dark:text-black px-4 py-2"
-                disabled={totalWordsSelected === 0}
+                disabled={effectiveSelectedCount === 0}
                 onClick={async ()=>{
                   // Build sequence
                   let base: Word[] = [];
@@ -770,7 +818,31 @@ export default function PracticePage() {
             </div>
             <div className="space-y-4">
               <div>
-                <div className="text-xl font-semibold mb-2">Chọn từ muốn luyện</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xl font-semibold">Chọn từ muốn luyện</div>
+                  {Array.from(selectedLectures).length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Select all words from chosen lectures
+                          const allIds: string[] = Array.from(selectedLectures).flatMap((lid)=> (wordsByLecture[lid] || []).map((x)=> x.word_id));
+                          setSelectedWordIds(new Set(allIds));
+                          setExplicitSelect(true);
+                        }}
+                        className="px-3 py-1.5 text-sm rounded border hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      >Chọn tất cả</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedWordIds(new Set());
+                          setExplicitSelect(true);
+                        }}
+                        className="px-3 py-1.5 text-sm rounded border hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      >Bỏ chọn tất cả</button>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-3 max-h-[420px] overflow-auto">
                   {loadingLectures && (
                     <div className="p-4 text-sm text-neutral-500 animate-pulse">Đang tải bài giảng và từ vựng...</div>
@@ -780,7 +852,7 @@ export default function PracticePage() {
                       <div className="font-semibold mb-1">{lectures.find((l)=>l.lecture_id===lid)?.title}</div>
                       <ul className="text-sm grid grid-cols-2 gap-2">
                         {(wordsByLecture[lid] || []).map((w)=> {
-                          const checked = explicitSelect ? selectedWordIds.has(w.word_id) : true;
+                          const checked = explicitSelect ? selectedWordIds.has(w.word_id) : false;
                           return (
                             <li key={w.word_id}>
                               <label className="flex items-center gap-1"><input type="checkbox" checked={checked} onChange={(e)=>{
