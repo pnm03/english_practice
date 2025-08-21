@@ -885,8 +885,38 @@ export default function PracticePage() {
           <div className="bg-white dark:bg-neutral-900 rounded-xl sm:rounded-2xl shadow-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
             {/* Notification area */}
             {message && (
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-b border-neutral-200 dark:border-neutral-700 p-4">
-                <div className="text-sm text-center">{message}</div>
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-b border-neutral-200 dark:border-neutral-700 p-3 sm:p-4">
+                {(() => {
+                  const currentMode = direction === 'random' ? (modes[idx] || 'en2vi') : direction;
+                  const result = isReviewMode ? practiceResults[idx] : null;
+                  const wrongInReview = !!result && result.correct === false;
+                  const revealedByAttempts = !isReviewMode && currentMode === 'vi2en' && answered && (attempts >= 2 || (typeof message === 'string' && message.includes('Đáp án')));
+                  const shouldReveal = current && currentMode === 'vi2en' && (revealedByAttempts || wrongInReview);
+                  if (!shouldReveal) {
+                    return <div className="text-sm text-center">{message}</div>;
+                  }
+                  return (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm text-neutral-800 dark:text-neutral-100">{message}</div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-sm text-neutral-700 dark:text-neutral-300">{current?.ipa ? `[${current.ipa}]` : '—'}</div>
+                        {current?.audio_url && (
+                          <>
+                            <button
+                              onClick={togglePlay}
+                              className={`px-3 py-1.5 rounded-full text-white text-xs font-medium shadow ${isPlaying ? 'bg-red-500' : 'bg-blue-600'} active:scale-95`}
+                            >
+                              {isPlaying ? 'Dừng' : 'Phát'}
+                            </button>
+                            <audio ref={audioRef} className="hidden">
+                              <source src={toPublicUrl(current.audio_url, 'word-audios') || undefined} />
+                            </audio>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
             
@@ -937,6 +967,7 @@ export default function PracticePage() {
                     <div className="text-2xl text-neutral-400">—</div>
                   )}
                 </div>
+                
               </div>
 
               {/* Example area (shows after 2 wrong attempts or on correct) */}
